@@ -33,6 +33,7 @@ class Config
     const BASE_URL = 'http://localhost';
     const LANGUAGE = 'english';
     const DEBUG_MODE = false;
+    const FRONTEND_URL = '';
 
     // ------------------------------------------------------------------------
     // DATABASE SETTINGS

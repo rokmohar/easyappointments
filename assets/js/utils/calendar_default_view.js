@@ -150,6 +150,11 @@ App.Utils.CalendarDefaultView = (function () {
         $appointmentsModal.find('#select-service').val(appointment.id_services).trigger('change');
         $appointmentsModal.find('#select-provider').val(appointment.id_users_provider);
 
+        if (appointment.service_ids && appointment.service_ids.length > 0) {
+            const additionalServiceIds = appointment.service_ids.map((service) => service.id);
+            $appointmentsModal.find('#select-additional-services').val(additionalServiceIds);
+        }
+
         App.Utils.UI.setDateTimePickerValue(
             $appointmentsModal.find('#start-datetime'),
             moment(appointment.start_datetime).toDate(),
@@ -435,7 +440,173 @@ App.Utils.CalendarDefaultView = (function () {
         } else {
             displayEdit = vars('privileges').appointments.edit ? '' : 'd-none';
             displayDelete = vars('privileges').appointments.delete ? 'me-2' : 'd-none';
-            $html = App.Utils.CalendarEventPopover.buildAppointmentPopover(info, displayEdit, displayDelete);
+
+            const customerInfo = [];
+
+            if (info.event.extendedProps.data.customer.first_name) {
+                customerInfo.push(info.event.extendedProps.data.customer.first_name);
+            }
+
+            if (info.event.extendedProps.data.customer.last_name) {
+                customerInfo.push(info.event.extendedProps.data.customer.last_name);
+            }
+
+            $html = $('<div/>', {
+                'html': [
+                    $('<strong/>', {
+                        'class': 'd-inline-block me-2',
+                        'text': lang('start'),
+                    }),
+                    $('<span/>', {
+                        'text': App.Utils.Date.format(
+                            moment(info.event.start).format('YYYY-MM-DD HH:mm:ss'),
+                            vars('date_format'),
+                            vars('time_format'),
+                            true,
+                        ),
+                    }),
+                    $('<br/>'),
+
+                    $('<strong/>', {
+                        'class': 'd-inline-block me-2',
+                        'text': lang('end'),
+                    }),
+                    $('<span/>', {
+                        'text': App.Utils.Date.format(
+                            moment(info.event.end).format('YYYY-MM-DD HH:mm:ss'),
+                            vars('date_format'),
+                            vars('time_format'),
+                            true,
+                        ),
+                    }),
+                    $('<br/>'),
+
+                    $('<strong/>', {
+                        'class': 'd-inline-block me-2',
+                        'text': lang('timezone'),
+                    }),
+                    $('<span/>', {
+                        'text': vars('timezones')[info.event.extendedProps.data.provider.timezone],
+                    }),
+                    $('<br/>'),
+
+                    $('<strong/>', {
+                        'class': 'd-inline-block me-2',
+                        'text': lang('status'),
+                    }),
+                    $('<span/>', {
+                        'text': info.event.extendedProps.data.status || '-',
+                    }),
+                    $('<br/>'),
+
+                    $('<strong/>', {
+                        'class': 'd-inline-block me-2',
+                        'text': lang('service'),
+                    }),
+                    $('<span/>', {
+                        'text': [info.event.extendedProps.data.service.name, ...(info.event.extendedProps.data.service_ids ?? []).map(service => service.name)].join(', '),
+                    }),
+                    $('<br/>'),
+
+                    $('<strong/>', {
+                        'class': 'd-inline-block me-2',
+                        'text': lang('provider'),
+                    }),
+                    App.Utils.CalendarEventPopover.renderMapIcon(info.event.extendedProps.data.provider),
+                    $('<span/>', {
+                        'text':
+                            info.event.extendedProps.data.provider.first_name +
+                            ' ' +
+                            info.event.extendedProps.data.provider.last_name,
+                    }),
+                    $('<br/>'),
+
+                    $('<strong/>', {
+                        'class': 'd-inline-block me-2',
+                        'text': lang('customer'),
+                    }),
+                    App.Utils.CalendarEventPopover.renderMapIcon(info.event.extendedProps.data.customer),
+                    $('<span/>', {
+                        'class': 'd-inline-block',
+                        'text': customerInfo.length ? customerInfo.join(' ') : '-',
+                    }),
+                    $('<br/>'),
+
+                    $('<strong/>', {
+                        'class': 'd-inline-block me-2',
+                        'text': lang('email'),
+                    }),
+                    App.Utils.CalendarEventPopover.renderMailIcon(info.event.extendedProps.data.customer.email),
+                    $('<span/>', {
+                        'class': 'd-inline-block',
+                        'text': info.event.extendedProps.data.customer.email || '-',
+                    }),
+                    $('<br/>'),
+
+                    $('<strong/>', {
+                        'class': 'd-inline-block me-2',
+                        'text': lang('phone'),
+                    }),
+                    App.Utils.CalendarEventPopover.renderPhoneIcon(info.event.extendedProps.data.customer.phone_number),
+                    $('<span/>', {
+                        'class': 'd-inline-block',
+                        'text': info.event.extendedProps.data.customer.phone_number || '-',
+                    }),
+                    $('<br/>'),
+
+                    $('<strong/>', {
+                        'class': 'd-inline-block me-2',
+                        'text': lang('notes'),
+                    }),
+                    $('<span/>', {
+                        'text': App.Utils.CalendarEventPopover.getEventNotes(info.event),
+                    }),
+                    $('<br/>'),
+
+                    App.Utils.CalendarEventPopover.renderCustomContent(info),
+
+                    $('<hr/>'),
+
+                    $('<div/>', {
+                        'class': 'd-flex justify-content-center',
+                        'html': [
+                            $('<button/>', {
+                                'class': 'close-popover btn btn-outline-secondary me-2',
+                                'html': [
+                                    $('<i/>', {
+                                        'class': 'fas fa-ban me-2',
+                                    }),
+                                    $('<span/>', {
+                                        'text': lang('close'),
+                                    }),
+                                ],
+                            }),
+                            $('<button/>', {
+                                'class': 'delete-popover btn btn-outline-secondary ' + displayDelete,
+                                'html': [
+                                    $('<i/>', {
+                                        'class': 'fas fa-trash-alt me-2',
+                                    }),
+                                    $('<span/>', {
+                                        'text': lang('delete'),
+                                    }),
+                                ],
+                            }),
+                            $('<button/>', {
+                                'class': 'edit-popover btn btn-primary ' + displayEdit,
+                                'html': [
+                                    $('<i/>', {
+                                        'class': 'fas fa-edit me-2',
+                                    }),
+                                    $('<span/>', {
+                                        'text': lang('edit'),
+                                    }),
+                                ],
+                            }),
+                        ],
+                    }),
+                ],
+            });
         }
 
         $target.popover({
@@ -906,12 +1077,17 @@ App.Utils.CalendarDefaultView = (function () {
                 .filter(Boolean)
                 .join(' ');
 
+            const serviceNames =
+                appointment.service_ids && appointment.service_ids.length > 0
+                    ? [appointment.service.name, ...appointment.service_ids.map((s) => s.name)].join(', ')
+                    : appointment.service.name;
+
             const type =
                 getSelectedFilterType() !== FILTER_TYPE_SERVICE
-                    ? appointment.service.name
+                    ? serviceNames
                     : [appointment.provider.first_name, appointment.provider.last_name].filter(Boolean).join(' ');
 
-            const title = customerName ? customerName + ' - ' + type : appointment.service.name;
+            const title = customerName ? customerName + ' - ' + type : serviceNames;
 
             return {
                 id: appointment.id,

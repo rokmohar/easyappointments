@@ -36,6 +36,7 @@ class Notifications
         $this->CI->load->model('appointments_model');
         $this->CI->load->model('providers_model');
         $this->CI->load->model('secretaries_model');
+        $this->CI->load->model('services_model');
         $this->CI->load->model('settings_model');
 
         $this->CI->load->library('email_messages');
@@ -68,7 +69,15 @@ class Notifications
 
             $provider_link = site_url('calendar/reschedule/' . $appointment['hash']);
 
-            $ics_stream = $this->CI->ics_file->get_stream($appointment, $service, $provider, $customer);
+            $additional_services = $this->get_additional_services($appointment);
+
+            $ics_stream = $this->CI->ics_file->get_stream(
+                $appointment,
+                $service,
+                $provider,
+                $customer,
+                $additional_services,
+            );
 
             // Notify customer.
             $send_customer =
@@ -93,6 +102,7 @@ class Notifications
                         $customer['email'],
                         $ics_stream,
                         $customer['timezone'],
+                        $additional_services,
                     );
                 } catch (Throwable $e) {
                     $this->log_exception($e, 'appointment-saved to customer', $appointment['id'] ?? null);
@@ -124,6 +134,7 @@ class Notifications
                         $provider['email'],
                         $ics_stream,
                         $provider['timezone'],
+                        $additional_services,
                     );
                 } catch (Throwable $e) {
                     $this->log_exception($e, 'appointment-saved to provider', $appointment['id'] ?? null);
@@ -156,6 +167,7 @@ class Notifications
                         $admin['email'],
                         $ics_stream,
                         $admin['timezone'],
+                        $additional_services,
                     );
                 } catch (Throwable $e) {
                     $this->log_exception($e, 'appointment-saved to admin', $appointment['id'] ?? null);
@@ -192,6 +204,7 @@ class Notifications
                         $secretary['email'],
                         $ics_stream,
                         $secretary['timezone'],
+                        $additional_services,
                     );
                 } catch (Throwable $e) {
                     $this->log_exception($e, 'appointment-saved to secretary', $appointment['id'] ?? null);
@@ -225,6 +238,8 @@ class Notifications
         try {
             $current_language = config('language');
 
+            $additional_services = $this->get_additional_services($appointment);
+
             // Notify provider.
             $send_provider = filter_var(
                 $this->CI->providers_model->get_setting($provider['id'], 'notifications'),
@@ -245,6 +260,7 @@ class Notifications
                         $provider['email'],
                         $cancellation_reason,
                         $provider['timezone'],
+                        $additional_services,
                     );
                 } catch (Throwable $e) {
                     $this->log_exception($e, 'appointment-deleted to provider', $appointment['id'] ?? null);
@@ -269,6 +285,7 @@ class Notifications
                         $customer['email'],
                         $cancellation_reason,
                         $customer['timezone'],
+                        $additional_services,
                     );
                 } catch (Throwable $e) {
                     $this->log_exception($e, 'appointment-deleted to customer', $appointment['id'] ?? null);
@@ -296,6 +313,7 @@ class Notifications
                         $admin['email'],
                         $cancellation_reason,
                         $admin['timezone'],
+                        $additional_services,
                     );
                 } catch (Throwable $e) {
                     $this->log_exception($e, 'appointment-deleted to admin', $appointment['id'] ?? null);
@@ -327,6 +345,7 @@ class Notifications
                         $secretary['email'],
                         $cancellation_reason,
                         $secretary['timezone'],
+                        $additional_services,
                     );
                 } catch (Throwable $e) {
                     $this->log_exception($e, 'appointment-deleted to secretary', $appointment['id'] ?? null);
@@ -345,6 +364,43 @@ class Notifications
             config(['language' => $current_language ?? 'english']);
             $this->CI->lang->load('translations');
         }
+    }
+
+    /**
+     * Resolve the additional services attached to an appointment (excluding the primary service).
+     *
+     * The appointment carries a `service_ids` array (populated by Appointments_model::find) that
+     * includes the primary service; fall back to the join table if it is not present.
+     *
+     * @param array $appointment Appointment data.
+     *
+     * @return array Array of service records, excluding the primary service.
+     */
+    private function get_additional_services(array $appointment): array
+    {
+        $service_ids =
+            $appointment['service_ids'] ??
+            (!empty($appointment['id'])
+                ? $this->CI->appointments_model->get_appointment_services($appointment['id'])
+                : []);
+
+        $primary_id = (int) ($appointment['id_services'] ?? 0);
+
+        $additional = [];
+
+        foreach ($service_ids as $service_id) {
+            if ((int) $service_id === $primary_id) {
+                continue; // Skip the primary service, it is already rendered.
+            }
+
+            $service = $this->CI->services_model->find($service_id);
+
+            if ($service) {
+                $additional[] = $service;
+            }
+        }
+
+        return $additional;
     }
 
     private function log_exception(Throwable $e, string $message, ?int $appointment_id): void

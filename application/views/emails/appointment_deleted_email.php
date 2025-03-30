@@ -427,6 +427,18 @@ $customer_address = trim((string) ($customer['address'] ?? ''));
                                                     <?= e($service['name']) ?>
                                                 </td>
                                             </tr>
+
+                                            <?php if (!empty($additional_services)): ?>
+                                            <tr>
+                                                <td class="label" style="padding: 3px;font-weight: bold;">
+                                                    <?= lang('additional_services') ?>
+                                                </td>
+                                                <td style="padding: 3px;">
+                                                    <?= e(implode(', ', array_column($additional_services, 'name'))) ?>
+                                                </td>
+                                            </tr>
+                                            <?php endif; ?>
+
                                             <tr>
                                                 <td class="label" style="padding: 3px;font-weight: bold;">
                                                     <?= lang('provider') ?>

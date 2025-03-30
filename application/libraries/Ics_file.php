@@ -54,14 +54,20 @@ class Ics_file
      * @param array $service Service data.
      * @param array $provider Provider data.
      * @param array $customer Customer data.
+     * @param array $additional_services Additional service records attached to the appointment.
      *
      * @return string Returns the contents of the ICS file.
      *
      * @throws CalendarEventException
      * @throws Exception
      */
-    public function get_stream(array $appointment, array $service, array $provider, array $customer): string
-    {
+    public function get_stream(
+        array $appointment,
+        array $service,
+        array $provider,
+        array $customer,
+        array $additional_services = [],
+    ): string {
         $appointment_timezone = new DateTimeZone($provider['timezone']);
 
         $appointment_start = new DateTime($appointment['start_datetime'], $appointment_timezone);
@@ -93,8 +99,21 @@ class Ics_file
             $meeting_link_content[] = '';
         }
 
+        $additional_service_content = [];
+
+        if (!empty($additional_services)) {
+            $additional_service_content[] = '';
+            $additional_service_content[] = lang('additional_services');
+            $additional_service_content[] = '';
+
+            foreach ($additional_services as $additional_service) {
+                $additional_service_content[] = $additional_service['name'];
+            }
+        }
+
         $description = [
             ...$meeting_link_content,
+            ...$additional_service_content,
             '',
             lang('provider'),
             '',

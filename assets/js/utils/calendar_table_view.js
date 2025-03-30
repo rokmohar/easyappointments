@@ -185,6 +185,12 @@ App.Utils.CalendarTableView = (function () {
         $appointmentsModal.find('#appointment-id').val(appointment.id);
         $appointmentsModal.find('#select-service').val(appointment.id_services).trigger('change');
         $appointmentsModal.find('#select-provider').val(appointment.id_users_provider);
+
+        if (appointment.service_ids && appointment.service_ids.length > 0) {
+            const additionalServiceIds = appointment.service_ids.map((service) => service.id);
+            $appointmentsModal.find('#select-additional-services').val(additionalServiceIds);
+        }
+
         App.Utils.UI.setDateTimePickerValue(
             $appointmentsModal.find('#start-datetime'),
             moment(appointment.start_datetime).toDate(),
@@ -873,7 +879,12 @@ App.Utils.CalendarTableView = (function () {
                     .filter(Boolean)
                     .join(' ');
 
-                const title = customerName ? customerName + ' - ' + appointment.service.name : appointment.service.name;
+                const serviceNames =
+                    appointment.service_ids && appointment.service_ids.length > 0
+                        ? [appointment.service.name, ...appointment.service_ids.map((s) => s.name)].join(', ')
+                        : appointment.service.name;
+
+                const title = customerName ? customerName + ' - ' + serviceNames : serviceNames;
 
                 return {
                     id: appointment.id,
