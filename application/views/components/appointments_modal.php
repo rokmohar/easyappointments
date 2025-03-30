@@ -46,7 +46,7 @@
                                         $has_category = false;
 
                                         foreach ($available_services as $service) {
-                                            if (!empty($service['category_id'])) {
+                                            if (!empty($service['service_category_id'])) {
                                                 $has_category = true;
                                                 break;
                                             }
@@ -56,12 +56,12 @@
                                             $grouped_services = [];
 
                                             foreach ($available_services as $service) {
-                                                if (!empty($service['category_id'])) {
-                                                    if (!isset($grouped_services[$service['category_name']])) {
-                                                        $grouped_services[$service['category_name']] = [];
+                                                if (!empty($service['service_category_id'])) {
+                                                    if (!isset($grouped_services[$service['service_category_name']])) {
+                                                        $grouped_services[$service['service_category_name']] = [];
                                                     }
 
-                                                    $grouped_services[$service['category_name']][] = $service;
+                                                    $grouped_services[$service['service_category_name']][] = $service;
                                                 }
                                             }
 
@@ -70,7 +70,7 @@
                                             $grouped_services['uncategorized'] = [];
 
                                             foreach ($available_services as $service) {
-                                                if ($service['category_id'] == null) {
+                                                if ($service['service_category_id'] == null) {
                                                     $grouped_services['uncategorized'][] = $service;
                                                 }
                                             }
@@ -78,7 +78,80 @@
                                             foreach ($grouped_services as $key => $group) {
                                                 $group_label =
                                                     $key !== 'uncategorized'
-                                                        ? e($group[0]['category_name'])
+                                                        ? e($group[0]['service_category_name'])
+                                                        : 'Uncategorized';
+
+                                                if (count($group) > 0) {
+                                                    echo '<optgroup label="' . $group_label . '">';
+
+                                                    foreach ($group as $service) {
+                                                        echo '<option value="' .
+                                                            $service['id'] .
+                                                            '">' .
+                                                            e($service['name']) .
+                                                            '</option>';
+                                                    }
+
+                                                    echo '</optgroup>';
+                                                }
+                                            }
+                                        } else {
+                                            foreach ($available_services as $service) {
+                                                echo '<option value="' .
+                                                    $service['id'] .
+                                                    '">' .
+                                                    e($service['name']) .
+                                                    '</option>';
+                                            }
+                                        }
+                                        ?>
+                                    </select>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label for="select-additional-services" class="form-label">
+                                        <?= lang('additional_services') ?>
+                                    </label>
+                                    <select id="select-additional-services" class="form-select" multiple>
+                                        <?php
+                                        // Group services by category, only if there is at least one service
+                                        // with a parent category.
+                                        $has_category = false;
+
+                                        foreach ($available_services as $service) {
+                                            if (!empty($service['service_category_id'])) {
+                                                $has_category = true;
+                                                break;
+                                            }
+                                        }
+
+                                        if ($has_category) {
+                                            $grouped_services = [];
+
+                                            foreach ($available_services as $service) {
+                                                if (!empty($service['service_category_id'])) {
+                                                    if (!isset($grouped_services[$service['service_category_name']])) {
+                                                        $grouped_services[$service['service_category_name']] = [];
+                                                    }
+
+                                                    $grouped_services[$service['service_category_name']][] = $service;
+                                                }
+                                            }
+
+                                            // We need the uncategorized services at the end of the list, so we will use
+                                            // another iteration only for the uncategorized services.
+                                            $grouped_services['uncategorized'] = [];
+
+                                            foreach ($available_services as $service) {
+                                                if ($service['service_category_id'] == null) {
+                                                    $grouped_services['uncategorized'][] = $service;
+                                                }
+                                            }
+
+                                            foreach ($grouped_services as $key => $group) {
+                                                $group_label =
+                                                    $key !== 'uncategorized'
+                                                        ? e($group[0]['service_category_name'])
                                                         : 'Uncategorized';
 
                                                 if (count($group) > 0) {
@@ -374,6 +447,10 @@
 
 <?php section('scripts'); ?>
 
+<link rel="stylesheet" href="<?= asset_url('assets/vendor/select2/select2.min.css') ?>">
+<link rel="stylesheet" href="<?= asset_url('assets/vendor/select2-bootstrap-5-theme/select2-bootstrap-5-theme.css') ?>">
+
+<script src="<?= asset_url('assets/vendor/select2/select2.min.js') ?>"></script>
 <script src="<?= asset_url('assets/js/components/appointments_modal.js') ?>"></script>
 
 <?php end_section('scripts'); ?>

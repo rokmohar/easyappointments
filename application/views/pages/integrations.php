@@ -134,6 +134,29 @@
                     </div>
                 </div>
 
+                <div class="col-sm-6 mb-4">
+                    <div class="card h-100">
+                        <div class="card-header">
+                            <h5 class="fw-light text-black-50 mb-0">
+                                <?= lang('migrations') ?>
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-3 integration-info">
+                                <small>
+                                    <?= lang('migrations_info') ?>
+                                </small>
+                            </div>
+                        </div>
+                        <div class="card-footer bg-white border-0">
+                            <button type="button" id="run-migrations" class="btn btn-outline-primary w-100">
+                                <i class="fas fa-sync me-2"></i>
+                                <?= lang('run_migrations') ?>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
                 <?php slot('after_integration_cards'); ?>
             </div>
         </div>
@@ -141,4 +164,11 @@
 </div>
 
 <?php end_section('content'); ?>
+
+<?php section('scripts'); ?>
+
+<script src="<?= asset_url('assets/js/utils/url.js') ?>"></script>
+<script src="<?= asset_url('assets/js/pages/integrations.js') ?>"></script>
+
+<?php end_section('scripts'); ?>
 

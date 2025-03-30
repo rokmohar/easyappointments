@@ -165,6 +165,13 @@ function vendor(done) {
         gulp.dest('assets/vendor/select2'),
     );
 
+    // select2-bootstrap-5-theme
+    gulp.src(['node_modules/select2-bootstrap-5-theme/dist/select2-bootstrap-5-theme.css'])
+        .pipe(gulp.dest('assets/vendor/select2-bootstrap-5-theme'))
+        .pipe(css())
+        .pipe(rename({suffix: '.min'}))
+        .pipe(gulp.dest('assets/vendor/select2-bootstrap-5-theme'));
+
     // tippy.js
     gulp.src(['node_modules/tippy.js/dist/tippy-bundle.umd.min.js']).pipe(gulp.dest('assets/vendor/tippy.js'));
 

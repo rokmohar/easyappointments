@@ -56,6 +56,7 @@ class Calendar extends EA_Controller
         'id_users_provider',
         'id_users_customer',
         'id_services',
+        'service_ids',
     ];
 
     public array $optional_appointment_fields = [
@@ -572,6 +573,16 @@ class Calendar extends EA_Controller
                 $appointment['provider'] = $this->providers_model->find($appointment['id_users_provider']);
                 $appointment['service'] = $this->services_model->find($appointment['id_services']);
                 $appointment['customer'] = $this->customers_model->find($appointment['id_users_customer']);
+
+                // Load additional services
+                $service_ids = $this->appointments_model->get_appointment_services($appointment['id']);
+                $appointment['service_ids'] = [];
+
+                foreach ($service_ids as $service_id) {
+                    if ($service_id != $appointment['id_services']) {
+                        $appointment['service_ids'][] = $this->services_model->find($service_id);
+                    }
+                }
             }
 
             unset($appointment);
@@ -708,6 +719,16 @@ class Calendar extends EA_Controller
                 $appointment['provider'] = $this->providers_model->find($appointment['id_users_provider']);
                 $appointment['service'] = $this->services_model->find($appointment['id_services']);
                 $appointment['customer'] = $this->customers_model->find($appointment['id_users_customer']);
+                
+                // Load additional services
+                $service_ids = $this->appointments_model->get_appointment_services($appointment['id']);
+                $appointment['service_ids'] = [];
+
+                foreach ($service_ids as $service_id) {
+                    if ($service_id != $appointment['id_services']) {
+                        $appointment['service_ids'][] = $this->services_model->find($service_id);
+                    }
+                }
             }
 
             unset($appointment);
