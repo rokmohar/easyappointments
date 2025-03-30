@@ -79,6 +79,7 @@ class Email_messages
         string $recipient_email,
         string $ics_stream,
         ?string $timezone = null,
+        array $additional_services = [],
     ): void {
         $appointment_timezone = new DateTimeZone($provider['timezone']);
 
@@ -103,6 +104,7 @@ class Email_messages
                 'message' => $message,
                 'appointment' => $appointment,
                 'service' => $service,
+                'additional_services' => $additional_services,
                 'provider' => $provider,
                 'customer' => $customer,
                 'settings' => $settings,
@@ -144,6 +146,7 @@ class Email_messages
         string $recipient_email,
         ?string $reason = null,
         ?string $timezone = null,
+        array $additional_services = [],
     ): void {
         $appointment_timezone = new DateTimeZone($provider['timezone']);
 
@@ -166,6 +169,7 @@ class Email_messages
             [
                 'appointment' => $appointment,
                 'service' => $service,
+                'additional_services' => $additional_services,
                 'provider' => $provider,
                 'customer' => $customer,
                 'settings' => $settings,

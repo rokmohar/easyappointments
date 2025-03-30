@@ -1,0 +1,11 @@
+.git
+.idea
+node_modules
+docker/mysql
+docker/baikal
+docker/openldap
+vendor
+storage/logs/*
+storage/cache/*
+storage/sessions/*
+storage/backups/*

@@ -3,6 +3,7 @@
 $lang['page_title'] = 'Rezerviraj termin z';
 $lang['service_and_provider'] = 'Storitev in ponudnik';
 $lang['select_service'] = 'Izberi storitev';
+$lang['select_additional_services'] = 'Izberite dodatne storitve';
 $lang['select_provider'] = 'Izberite ponudnika';
 $lang['duration'] = 'Trajanje';
 $lang['minutes'] = 'Minute';
@@ -42,6 +43,7 @@ $lang['thank_you_for_appointment'] = 'Hvala, ker ste se dogovorili za sestanek z
 $lang['appointment_details_title'] = 'Podrobnosti o terminu';
 $lang['customer_details_title'] = 'Podrobnosti o stranki';
 $lang['service'] = 'Storitev';
+$lang['additional_services'] = 'Dodatne storitve';
 $lang['provider'] = 'Ponudnik';
 $lang['customer'] = 'Stranka';
 $lang['start'] = 'Začetek';

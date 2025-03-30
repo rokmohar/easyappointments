@@ -3,6 +3,7 @@
 $lang['page_title'] = 'Book Appointment With';
 $lang['service_and_provider'] = 'Service & Provider';
 $lang['select_service'] = 'Select Service';
+$lang['select_additional_services'] = 'Select Additional Services';
 $lang['select_provider'] = 'Select Provider';
 $lang['duration'] = 'Duration';
 $lang['minutes'] = 'Minutes';
@@ -42,6 +43,7 @@ $lang['thank_you_for_appointment'] = 'Thank you for arranging an appointment wit
 $lang['appointment_details_title'] = 'Appointment Details';
 $lang['customer_details_title'] = 'Customer Details';
 $lang['service'] = 'Service';
+$lang['additional_services'] = 'Additional Services';
 $lang['provider'] = 'Provider';
 $lang['customer'] = 'Customer';
 $lang['start'] = 'Start';
@@ -574,4 +576,9 @@ $lang['about_app_premium'] = 'We offer end-to-end services for self-hosted softw
 $lang['go_premium'] = 'Go Premium';
 $lang['notify_users_on_create_question'] = 'Would you like to send out a notification about this change?';
 $lang['notify_users_on_delete_question'] = 'Would you like to send out a notification about this change?';
+$lang['migrations'] = 'Custom Migrations';
+$lang['migrations_info'] = 'Run custom database migrations defined in the application/migrations/custom directory.';
+$lang['run_migrations'] = 'Run Migrations';
+$lang['migrations_completed'] = 'Custom database migrations completed successfully.';
+$lang['migrations_failed'] = 'Custom database migrations failed. Please check the error logs for more information.';
 // End

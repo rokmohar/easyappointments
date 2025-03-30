@@ -235,6 +235,129 @@ class Appointments_api_v1 extends EA_Controller
     }
 
     /**
+     * Store a new appointment with customer upsert.
+     *
+     * Accepts both customer and appointment data, upserts the customer
+     * (creates if not found, updates if found by email or phone), then creates the appointment.
+     */
+    public function store_with_relations(): void
+    {
+        try {
+            $request_data = request();
+
+            if (empty($request_data['customer']) || empty($request_data['appointment'])) {
+                throw new InvalidArgumentException('Both customer and appointment data must be provided.');
+            }
+
+            $customer_data = $request_data['customer'];
+            $appointment_data = $request_data['appointment'];
+
+            if (empty($customer_data['email']) && empty($customer_data['phone_number'])) {
+                throw new InvalidArgumentException('Customer must have at least an email or phone number.');
+            }
+
+            $this->customers_model->api_decode($customer_data);
+
+            $existing_customer_id = $this->find_customer_by_email_or_phone($customer_data);
+
+            if ($existing_customer_id) {
+                $customer_data['id'] = $existing_customer_id;
+            } else {
+                unset($customer_data['id']);
+            }
+
+            $customer_data['timezone'] = 'Europe/Ljubljana';
+            $customer_data['language'] = 'slovenian';
+
+            $customer_id = $this->customers_model->save($customer_data);
+
+            $this->appointments_model->api_decode($appointment_data);
+
+            $appointment_data['id_users_customer'] = $customer_id;
+
+            if (array_key_exists('id', $appointment_data)) {
+                unset($appointment_data['id']);
+            }
+
+            if (!array_key_exists('end_datetime', $appointment_data)) {
+                $appointment_data['end_datetime'] = $this->calculate_end_datetime($appointment_data);
+            }
+
+            $appointment_id = $this->appointments_model->save($appointment_data);
+
+            $created_appointment = $this->appointments_model->find($appointment_id);
+
+            $this->notify_and_sync_appointment($created_appointment);
+
+            $this->appointments_model->api_encode($created_appointment);
+
+            $upserted_customer = $this->customers_model->find($customer_id);
+            $this->customers_model->api_encode($upserted_customer);
+
+            $response = [
+                'appointment' => $created_appointment,
+                'customer' => $upserted_customer,
+            ];
+
+            json_response($response, 201);
+        } catch (Throwable $e) {
+            json_exception($e);
+        }
+    }
+
+    /**
+     * Find a customer by email or phone number.
+     *
+     * @param array $customer_data Customer data containing email and/or phone_number.
+     *
+     * @return int|null Returns the customer ID if found, null otherwise.
+     */
+    private function find_customer_by_email_or_phone(array $customer_data): ?int
+    {
+        $this->db->select('users.id')
+            ->from('users')
+            ->join('roles', 'roles.id = users.id_roles', 'inner')
+            ->where('roles.slug', DB_SLUG_CUSTOMER);
+
+        if (!empty($customer_data['email']) && !empty($customer_data['phone_number'])) {
+            $this->db->group_start()
+                ->where('users.email', $customer_data['email'])
+                ->or_where('users.phone_number', $customer_data['phone_number'])
+                ->group_end();
+        } elseif (!empty($customer_data['email'])) {
+            $this->db->where('users.email', $customer_data['email']);
+        } elseif (!empty($customer_data['phone_number'])) {
+            $this->db->where('users.phone_number', $customer_data['phone_number']);
+        } else {
+            return null;
+        }
+
+        $result = $this->db->get()->row_array();
+
+        return $result ? (int) $result['id'] : null;
+    }
+
+    /**
+     * Calculate the end date time of an appointment based on the selected service.
+     *
+     * @param array $appointment Appointment data.
+     *
+     * @return string Returns the end date time value.
+     *
+     * @throws Exception
+     */
+    private function calculate_end_datetime(array $appointment): string
+    {
+        $duration = $this->services_model->value($appointment['id_services'], 'duration');
+
+        $end = new DateTime($appointment['start_datetime']);
+
+        $end->add(new DateInterval('PT' . $duration . 'M'));
+
+        return $end->format('Y-m-d H:i:s');
+    }
+
+    /**
      * Send the required notifications and trigger syncing after saving an appointment.
      *
      * @param array $appointment Appointment data.
@@ -274,6 +397,119 @@ class Appointments_api_v1 extends EA_Controller
         );
 
         $this->webhooks_client->trigger(WEBHOOK_APPOINTMENT_SAVE, $appointment);
+    }
+
+    /**
+     * Cancel an appointment by hash.
+     *
+     * @param string|null $hash Appointment hash.
+     */
+    public function cancel(?string $hash = null): void
+    {
+        try {
+            $occurrences = $this->appointments_model->get(['hash' => $hash]);
+
+            if (empty($occurrences)) {
+                response('', 404);
+
+                return;
+            }
+
+            $appointment = $occurrences[0];
+
+            $body = request();
+            $cancellation_reason = strip_tags(substr(trim($body['cancellation_reason'] ?? ''), 0, 1000));
+
+            $provider = $this->providers_model->find($appointment['id_users_provider']);
+            $customer = $this->customers_model->find($appointment['id_users_customer']);
+            $service = $this->services_model->find($appointment['id_services']);
+
+            $company_color = setting('company_color');
+
+            $settings = [
+                'company_name' => setting('company_name'),
+                'company_email' => setting('company_email'),
+                'company_link' => setting('company_link'),
+                'company_color' => !empty($company_color) && $company_color != DEFAULT_COMPANY_COLOR ? $company_color : null,
+                'date_format' => setting('date_format'),
+                'time_format' => setting('time_format'),
+            ];
+
+            $appointment['service_ids'] = $this->appointments_model->get_appointment_services($appointment['id']);
+
+            $this->appointments_model->delete($appointment['id']);
+
+            $this->synchronization->sync_appointment_deleted($appointment, $provider);
+
+            $this->notifications->notify_appointment_deleted($appointment, $service, $provider, $customer, $settings, $cancellation_reason);
+
+            $this->webhooks_client->trigger(WEBHOOK_APPOINTMENT_DELETE, $appointment);
+
+            json_response(['success' => true]);
+        } catch (Throwable $e) {
+            json_exception($e);
+        }
+    }
+
+    /**
+     * Get a single appointment with all related data (customer, provider, services).
+     *
+     * @param string|null $hash Appointment hash.
+     */
+    public function show_with_relations(?string $hash = null): void
+    {
+        try {
+            $occurrences = $this->appointments_model->get(['hash' => $hash]);
+
+            if (empty($occurrences)) {
+                response('', 404);
+
+                return;
+            }
+
+            $appointment = $this->appointments_model->find($occurrences[0]['id']);
+
+            $this->appointments_model->api_encode($appointment);
+
+            $customer_id = $appointment['customerId'];
+
+            if ($customer_id) {
+                $customer = $this->customers_model->find($customer_id);
+                $this->customers_model->api_encode($customer);
+                $appointment['customer'] = $customer;
+            }
+
+            $provider_id = $appointment['providerId'];
+
+            if ($provider_id) {
+                $provider = $this->providers_model->find($provider_id);
+                $this->providers_model->api_encode($provider);
+                $appointment['provider'] = $provider;
+            }
+
+            $service_ids = $appointment['serviceIds'] ?? [];
+
+            if (empty($service_ids) && !empty($appointment['serviceId'])) {
+                $service_ids = [$appointment['serviceId']];
+            }
+
+            $services = [];
+
+            foreach ($service_ids as $service_id) {
+                $service = $this->services_model->find($service_id);
+
+                if ($service) {
+                    $this->services_model->api_encode($service);
+                    $services[] = $service;
+                }
+            }
+
+            $appointment['services'] = $services;
+
+            json_response($appointment);
+        } catch (Throwable $e) {
+            json_exception($e);
+        }
     }
 
     /**
@@ -347,6 +583,8 @@ class Appointments_api_v1 extends EA_Controller
                 'date_format' => setting('date_format'),
                 'time_format' => setting('time_format'),
             ];
+
+            $deleted_appointment['service_ids'] = $this->appointments_model->get_appointment_services($id);
 
             $this->appointments_model->delete($id);
 

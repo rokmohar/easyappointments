@@ -12,6 +12,17 @@
 */
 
 /**
+ * Redirect public booking pages to the external frontend (when FRONTEND_URL is configured).
+ */
+$hook['post_controller_constructor'][] = [
+    'class' => '',
+    'function' => 'frontend_redirect',
+    'filename' => 'frontend_redirect.php',
+    'filepath' => 'hooks',
+    'params' => [],
+];
+
+/**
  * Add security headers to all responses.
  */
 $hook['post_controller_constructor'][] = [

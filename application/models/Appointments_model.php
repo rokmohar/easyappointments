@@ -44,6 +44,7 @@ class Appointments_model extends EA_Model
         'notes' => 'notes',
         'hash' => 'hash',
         'serviceId' => 'id_services',
+        'serviceIds' => 'service_ids',
         'providerId' => 'id_users_provider',
         'customerId' => 'id_users_customer',
         'googleCalendarId' => 'id_google_calendar',
@@ -123,6 +124,13 @@ class Appointments_model extends EA_Model
             );
         }
 
+        // Check for overlapping appointments
+        if ($this->has_overlapping_appointment($appointment)) {
+            throw new InvalidArgumentException(
+                'The appointment time period overlaps with an existing appointment for the same provider.'
+            );
+        }
+
         // Make sure the provider ID really exists in the database.
         $count = $this->db
             ->select()
@@ -163,6 +171,58 @@ class Appointments_model extends EA_Model
                 throw new InvalidArgumentException('Appointment service id is invalid.');
             }
         }
+    }
+
+    /**
+     * Check if the appointment overlaps with any existing appointments for the same provider.
+     *
+     * @param array $appointment Appointment data.
+     *
+     * @return bool Returns true if there's an overlapping appointment, false otherwise.
+     */
+    protected function has_overlapping_appointment(array $appointment): bool
+    {
+        $start_datetime = $appointment['start_datetime'];
+        $end_datetime = $appointment['end_datetime'];
+        $provider_id = $appointment['id_users_provider'];
+        $appointment_id = $appointment['id'] ?? null;
+
+        // Build query to find overlapping appointments for the same provider
+        $this->db->select('id')
+            ->from('appointments')
+            ->where('id_users_provider', $provider_id)
+            ->where('is_unavailability', false)
+            ->group_start()
+                // Case 1: New appointment starts during an existing appointment
+                ->group_start()
+                    ->where('start_datetime <=', $start_datetime)
+                    ->where('end_datetime >', $start_datetime)
+                ->group_end()
+                // Case 2: New appointment ends during an existing appointment
+                ->or_group_start()
+                    ->where('start_datetime <', $end_datetime)
+                    ->where('end_datetime >=', $end_datetime)
+                ->group_end()
+                // Case 3: New appointment completely contains an existing appointment
+                ->or_group_start()
+                    ->where('start_datetime >=', $start_datetime)
+                    ->where('end_datetime <=', $end_datetime)
+                ->group_end()
+                // Case 4: Existing appointment completely contains the new appointment
+                ->or_group_start()
+                    ->where('start_datetime <=', $start_datetime)
+                    ->where('end_datetime >=', $end_datetime)
+                ->group_end()
+            ->group_end();
+
+        // Exclude the current appointment if we're updating
+        if ($appointment_id) {
+            $this->db->where('id !=', $appointment_id);
+        }
+
+        $overlapping_appointments = $this->db->get()->result_array();
+
+        return !empty($overlapping_appointments);
     }
 
     /**
@@ -216,11 +276,27 @@ class Appointments_model extends EA_Model
         $appointment['update_datetime'] = date('Y-m-d H:i:s');
         $appointment['hash'] = random_string('alnum', 12);
 
+        // Store service IDs for many-to-many relationship
+        $service_ids = $appointment['service_ids'] ?? [];
+
+        if (!empty($appointment['id_services']) && !in_array($appointment['id_services'], $service_ids)) {
+            $service_ids[] = $appointment['id_services'];
+        }
+
+        unset($appointment['service_ids']);
+
         if (!$this->db->insert('appointments', $appointment)) {
             throw new RuntimeException('Could not insert appointment.');
         }
 
-        return $this->db->insert_id();
+        $appointment_id = $this->db->insert_id();
+
+        // Insert service relationships
+        if (!empty($service_ids)) {
+            $this->add_appointment_services($appointment_id, $service_ids);
+        }
+
+        return $appointment_id;
     }
 
     /**
@@ -236,8 +312,22 @@ class Appointments_model extends EA_Model
     {
         $appointment['update_datetime'] = date('Y-m-d H:i:s');
 
+        // Store service IDs for many-to-many relationship
+        $service_ids = $appointment['service_ids'] ?? [];
+
+        if (!empty($appointment['id_services']) && !in_array($appointment['id_services'], $service_ids)) {
+            $service_ids[] = $appointment['id_services'];
+        }
+
+        unset($appointment['service_ids']);
+
         if (!$this->db->update('appointments', $appointment, ['id' => $appointment['id']])) {
             throw new RuntimeException('Could not update appointment record.');
+        }
+
+        // Update service relationships
+        if (!empty($service_ids)) {
+            $this->update_appointment_services($appointment['id'], $service_ids);
         }
 
         return $appointment['id'];
@@ -263,6 +353,9 @@ class Appointments_model extends EA_Model
         }
 
         $this->cast($appointment);
+
+        // Load associated services
+        $appointment['service_ids'] = $this->get_appointment_services($appointment_id);
 
         return $appointment;
     }
@@ -446,6 +539,25 @@ class Appointments_model extends EA_Model
     }
 
     /**
+     * Get services for an appointment.
+     *
+     * @param int $appointment_id Appointment ID.
+     *
+     * @return array Array of service IDs.
+     */
+    public function get_appointment_services(int $appointment_id): array
+    {
+        $services = $this->db
+            ->select('id_services')
+            ->from('appointment_services')
+            ->where('id_appointments', $appointment_id)
+            ->get()
+            ->result_array();
+
+        return array_column($services, 'id_services');
+    }
+
+    /**
      * Get the query builder interface, configured for use with the appointments table.
      *
      * @return CI_DB_query_builder
@@ -607,6 +719,7 @@ class Appointments_model extends EA_Model
             'providerId' => $appointment['id_users_provider'] !== null ? (int) $appointment['id_users_provider'] : null,
             'serviceId' => $appointment['id_services'] !== null ? (int) $appointment['id_services'] : null,
             'meetingLink' => $appointment['meeting_link'],
+            'serviceIds' => $appointment['service_ids'] ?? [],
             'googleCalendarId' =>
                 $appointment['id_google_calendar'] !== null ? $appointment['id_google_calendar'] : null,
             'caldavCalendarId' =>
@@ -672,6 +785,10 @@ class Appointments_model extends EA_Model
 
         if (array_key_exists('serviceId', $appointment)) {
             $decoded_resource['id_services'] = $appointment['serviceId'];
+        }
+
+        if (array_key_exists('serviceIds', $appointment)) {
+            $decoded_resource['service_ids'] = $appointment['serviceIds'];
         }
 
         if (array_key_exists('googleCalendarId', $appointment)) {
@@ -743,5 +860,41 @@ class Appointments_model extends EA_Model
             ->group_end()
             ->get()
             ->num_rows() > 0;
+    }
+
+    /**
+     * Add services to an appointment.
+     *
+     * @param int $appointment_id Appointment ID.
+     * @param array $service_ids Array of service IDs.
+     */
+    protected function add_appointment_services(int $appointment_id, array $service_ids): void
+    {
+        $data = [];
+        foreach ($service_ids as $service_id) {
+            $data[] = [
+                'id_appointments' => $appointment_id,
+                'id_services' => $service_id,
+            ];
+        }
+
+        if (!empty($data)) {
+            $this->db->insert_batch('appointment_services', $data);
+        }
+    }
+
+    /**
+     * Update services for an appointment.
+     *
+     * @param int $appointment_id Appointment ID.
+     * @param array $service_ids Array of service IDs.
+     */
+    protected function update_appointment_services(int $appointment_id, array $service_ids): void
+    {
+        // Delete existing relationships
+        $this->db->delete('appointment_services', ['id_appointments' => $appointment_id]);
+
+        // Add new relationships
+        $this->add_appointment_services($appointment_id, $service_ids);
     }
 }
