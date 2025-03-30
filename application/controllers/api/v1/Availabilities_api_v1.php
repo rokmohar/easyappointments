@@ -43,8 +43,9 @@ class Availabilities_api_v1 extends EA_Controller
      * This resource requires the following query parameters:
      *
      *   - serviceId
-     *   - providerI
-     *   - date
+     *   - providerId
+     *   - date (start date)
+     *   - endDate (optional, if not provided only the start date will be checked)
      *
      * Based on those values it will generate the available hours, just like how the booking page works.
      *
@@ -58,9 +59,7 @@ class Availabilities_api_v1 extends EA_Controller
     {
         try {
             $provider_id = request('providerId');
-
             $service_id = request('serviceId');
-
             $date = request('date');
 
             if (!$date) {
@@ -69,11 +68,48 @@ class Availabilities_api_v1 extends EA_Controller
 
             $provider = $this->providers_model->find($provider_id);
 
-            $service = $this->services_model->find($service_id);
+            if (is_array($service_id)) {
+                $totalDuration = 0;
+                $service = null;
 
-            $available_hours = $this->availability->get_available_hours($date, $service, $provider);
+                for ($i = 0; $i < count($service_id); $i++) {
+                    $currentService = $this->services_model->find($service_id[$i]);
 
-            json_response($available_hours);
+                    if ($service === null || $service['duration'] < $currentService['duration']) {
+                        $service = $currentService;
+                    }
+
+                    $totalDuration += $currentService['duration'];
+                }
+
+                $service['originalDuration'] = $service['duration'];
+                $service['duration'] = $totalDuration;
+            } else {
+                $service = $this->services_model->find($service_id);
+            }
+
+            $until = request('until');
+
+            if (!$until) {
+                $available_hours = $this->availability->get_available_hours($date, $service, $provider);
+                json_response($available_hours);
+                return;
+            }
+
+            $result = [];
+
+            // Handle date range
+            $current_date = new DateTime($date);
+            $until_date = new DateTime($until);
+
+            while ($current_date <= $until_date) {
+                $current_date_str = $current_date->format('Y-m-d');
+                $available_hours = $this->availability->get_available_hours($current_date_str, $service, $provider);
+                $result[$current_date_str] = $available_hours;
+                $current_date->modify('+1 day');
+            }
+
+            json_response($result);
         } catch (Throwable $e) {
             json_exception($e);
         }
