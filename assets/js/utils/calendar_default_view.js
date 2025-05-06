@@ -141,6 +141,12 @@ App.Utils.CalendarDefaultView = (function () {
                 $appointmentsModal.find('#select-service').val(appointment.id_services).trigger('change');
                 $appointmentsModal.find('#select-provider').val(appointment.id_users_provider);
 
+                // Set additional services if they exist
+                if (appointment.service_ids && appointment.service_ids.length > 0) {
+                    const additionalServiceIds = appointment.service_ids.map(service => service.id);
+                    $appointmentsModal.find('#select-additional-services').val(additionalServiceIds);
+                }
+
                 // Set the start and end datetime of the appointment.
                 startMoment = moment(appointment.start_datetime);
                 App.Utils.UI.setDateTimePickerValue($appointmentsModal.find('#start-datetime'), startMoment.toDate());
@@ -652,7 +658,7 @@ App.Utils.CalendarDefaultView = (function () {
                         'text': lang('service'),
                     }),
                     $('<span/>', {
-                        'text': info.event.extendedProps.data.service.name,
+                        'text': [info.event.extendedProps.data.service.name, ...(info.event.extendedProps.data.service_ids ?? []).map(service => service.name)].join(', '),
                     }),
                     $('<br/>'),
 
@@ -1201,7 +1207,15 @@ App.Utils.CalendarDefaultView = (function () {
 
                 // Add appointments to calendar.
                 response.appointments.forEach((appointment) => {
-                    const title = [appointment.service.name];
+                    const title = [];
+
+                    // Add additional services if they exist
+                    if (appointment.service_ids && appointment.service_ids.length > 0) {
+                        const additionalServiceNames = appointment.service_ids.map(service => service.name);
+                        title.push([appointment.service.name, ...additionalServiceNames].join(', '));
+                    } else {
+                        title.push(appointment.service.name);
+                    }
 
                     const customerInfo = [];
 
@@ -1600,6 +1614,12 @@ App.Utils.CalendarDefaultView = (function () {
             $appointmentsModal.find('#appointment-id').val(appointment.id);
             $appointmentsModal.find('#select-service').val(appointment.id_services).trigger('change');
             $appointmentsModal.find('#select-provider').val(appointment.id_users_provider);
+
+            // Set additional services if they exist
+            if (appointment.service_ids && appointment.service_ids.length > 0) {
+                const additionalServiceIds = appointment.service_ids.map(service => service.id);
+                $appointmentsModal.find('#select-additional-services').val(additionalServiceIds);
+            }
 
             // Set the start and end datetime of the appointment.
             const startDatetimeMoment = moment(appointment.start_datetime);

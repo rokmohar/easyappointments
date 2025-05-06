@@ -3,6 +3,7 @@
 $lang['page_title'] = 'Book Appointment With';
 $lang['service_and_provider'] = 'Service & Provider';
 $lang['select_service'] = 'Select Service';
+$lang['select_additional_services'] = 'Select Additional Services';
 $lang['select_provider'] = 'Select Provider';
 $lang['duration'] = 'Duration';
 $lang['minutes'] = 'Minutes';
@@ -42,6 +43,7 @@ $lang['thank_you_for_appointment'] = 'Thank you for arranging an appointment wit
 $lang['appointment_details_title'] = 'Appointment Details';
 $lang['customer_details_title'] = 'Customer Details';
 $lang['service'] = 'Service';
+$lang['additional_services'] = 'Additional Services';
 $lang['provider'] = 'Provider';
 $lang['customer'] = 'Customer';
 $lang['start'] = 'Start';

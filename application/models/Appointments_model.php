@@ -218,9 +218,11 @@ class Appointments_model extends EA_Model
 
         // Store service IDs for many-to-many relationship
         $service_ids = $appointment['service_ids'] ?? [];
-        if (!empty($appointment['id_services'])) {
+
+        if (!empty($appointment['id_services']) && !in_array($appointment['id_services'], $service_ids)) {
             $service_ids[] = $appointment['id_services'];
         }
+
         unset($appointment['service_ids']);
 
         if (!$this->db->insert('appointments', $appointment)) {
@@ -252,9 +254,11 @@ class Appointments_model extends EA_Model
 
         // Store service IDs for many-to-many relationship
         $service_ids = $appointment['service_ids'] ?? [];
-        if (!empty($appointment['id_services'])) {
+
+        if (!empty($appointment['id_services']) && !in_array($appointment['id_services'], $service_ids)) {
             $service_ids[] = $appointment['id_services'];
         }
+
         unset($appointment['service_ids']);
 
         if (!$this->db->update('appointments', $appointment, ['id' => $appointment['id']])) {
@@ -472,6 +476,25 @@ class Appointments_model extends EA_Model
             ->row_array();
 
         return $result['attendants_number'];
+    }
+
+    /**
+     * Get services for an appointment.
+     *
+     * @param int $appointment_id Appointment ID.
+     *
+     * @return array Array of service IDs.
+     */
+    public function get_appointment_services(int $appointment_id): array
+    {
+        $services = $this->db
+            ->select('id_services')
+            ->from('appointment_services')
+            ->where('id_appointments', $appointment_id)
+            ->get()
+            ->result_array();
+
+        return array_column($services, 'id_services');
     }
 
     /**
@@ -716,24 +739,5 @@ class Appointments_model extends EA_Model
 
         // Add new relationships
         $this->add_appointment_services($appointment_id, $service_ids);
-    }
-
-    /**
-     * Get services for an appointment.
-     *
-     * @param int $appointment_id Appointment ID.
-     *
-     * @return array Array of service IDs.
-     */
-    protected function get_appointment_services(int $appointment_id): array
-    {
-        $services = $this->db
-            ->select('id_services')
-            ->from('appointment_services')
-            ->where('id_appointments', $appointment_id)
-            ->get()
-            ->result_array();
-
-        return array_column($services, 'id_services');
     }
 }
