@@ -43,6 +43,7 @@ App.Components.AppointmentsModal = (function () {
     const $selectFilterItem = $('#select-filter-item');
     const $selectService = $('#select-service');
     const $selectProvider = $('#select-provider');
+    const $selectAdditionalServices = $('#select-additional-services');
     const $insertAppointment = $('#insert-appointment');
     const $existingCustomersList = $('#existing-customers-list');
     const $newCustomer = $('#new-customer');
@@ -74,6 +75,15 @@ App.Components.AppointmentsModal = (function () {
      */
     function addEventListeners() {
         /**
+         * Event: Modal is fully shown
+         *
+         * Make sure Select2 is properly initialized and visible
+         */
+        $appointmentsModal.on('shown.bs.modal', () => {
+            initializeSelect2();
+        });
+
+        /**
          * Event: Manage Appointments Dialog Save Button "Click"
          *
          * Stores the appointment changes or inserts a new appointment depending on the dialog mode.
@@ -95,6 +105,7 @@ App.Components.AppointmentsModal = (function () {
 
             const appointment = {
                 id_services: $selectService.val(),
+                service_ids: $selectAdditionalServices.val() || [],
                 id_users_provider: $selectProvider.val(),
                 start_datetime: startDatetime,
                 end_datetime: endDatetime,
@@ -176,7 +187,6 @@ App.Components.AppointmentsModal = (function () {
                 );
 
                 if (providers.length) {
-                    $selectService.val(providers[0].services[0]).trigger('change');
                     $selectProvider.val(providerId);
                 }
             } else if ($selectFilterItem.find('option:selected').attr('type') === 'service') {
@@ -185,6 +195,8 @@ App.Components.AppointmentsModal = (function () {
                 $selectService.find('option:first').prop('selected', true).trigger('change');
             }
 
+            $selectService.val([]).trigger('change');
+            $selectAdditionalServices.val([]).trigger('change');
             $selectProvider.trigger('change');
 
             const serviceId = $selectService.val();
@@ -354,25 +366,57 @@ App.Components.AppointmentsModal = (function () {
          * update the start and end time of the appointment.
          */
         $selectService.on('change', () => {
+            const lastServiceId = $selectService.data('val') || null;
             const serviceId = $selectService.val();
-
+            const additionalServiceIds = $selectAdditionalServices.val() || [];
             const providerId = $selectProvider.val();
 
+            $selectService.data('val', serviceId);
             $selectProvider.empty();
 
             // Automatically update the service duration.
-            const service = vars('available_services').find((availableService) => {
-                return Number(availableService.id) === Number(serviceId);
-            });
+            const primaryService = vars('available_services').find(
+                (availableService) => Number(availableService.id) === Number(serviceId)
+            );
 
-            if (service?.color) {
-                App.Components.ColorSelection.setColor($appointmentColor, service.color);
+            if (primaryService?.color) {
+                App.Components.ColorSelection.setColor($appointmentColor, primaryService.color);
             }
 
-            const duration = service ? service.duration : 60;
+            // Update additional services list to exclude the selected primary service
+            $selectAdditionalServices.find('option').prop('disabled', false);
+            $selectAdditionalServices.find(`option[value="${serviceId}"]`).prop('disabled', true);
 
+            // Remove primary service from additional services if it's there
+            const filteredAdditionalServices = additionalServiceIds.filter(id => id !== serviceId);
+            if (filteredAdditionalServices.length !== additionalServiceIds.length) {
+                if (lastServiceId && !filteredAdditionalServices.includes(lastServiceId)) {
+                    filteredAdditionalServices.push(lastServiceId);
+                }
+                $selectAdditionalServices.val(filteredAdditionalServices).trigger('change');
+            }
+
+            // Calculate total duration
+            let totalDuration = 0;
+
+            // Add primary service duration
+            if (primaryService) {
+                totalDuration += parseInt(primaryService.duration, 10);
+            }
+
+            // Add additional services duration
+            filteredAdditionalServices.forEach(additionalServiceId => {
+                const additionalService = vars('available_services').find(
+                    (availableService) => Number(availableService.id) === Number(additionalServiceId)
+                );
+                if (additionalService) {
+                    totalDuration += parseInt(additionalService.duration, 10);
+                }
+            });
+
+            // Update end time
             const startDateTimeObject = App.Utils.UI.getDateTimePickerValue($startDatetime);
-            const endDateTimeObject = new Date(startDateTimeObject.getTime() + duration * 60000);
+            const endDateTimeObject = new Date(startDateTimeObject.getTime() + totalDuration * 60000);
             App.Utils.UI.setDateTimePickerValue($endDatetime, endDateTimeObject);
 
             // Update the providers select box.
@@ -406,6 +450,42 @@ App.Components.AppointmentsModal = (function () {
         });
 
         /**
+         * Event: Additional Services "Change"
+         *
+         * When additional services are selected/deselected, update the appointment duration and end time.
+         */
+        $selectAdditionalServices.on('change', () => {
+            const serviceId = $selectService.val();
+            const additionalServiceIds = $selectAdditionalServices.val() || [];
+
+            // Calculate total duration
+            let totalDuration = 0;
+
+            // Add primary service duration
+            const primaryService = vars('available_services').find(
+                (availableService) => Number(availableService.id) === Number(serviceId)
+            );
+            if (primaryService) {
+                totalDuration += parseInt(primaryService.duration, 10);
+            }
+
+            // Add additional services duration
+            additionalServiceIds.forEach(additionalServiceId => {
+                const additionalService = vars('available_services').find(
+                    (availableService) => Number(availableService.id) === Number(additionalServiceId)
+                );
+                if (additionalService) {
+                    totalDuration += parseInt(additionalService.duration, 10);
+                }
+            });
+
+            // Update end time
+            const startDateTimeObject = App.Utils.UI.getDateTimePickerValue($startDatetime);
+            const endDateTimeObject = new Date(startDateTimeObject.getTime() + totalDuration * 60000);
+            App.Utils.UI.setDateTimePickerValue($endDatetime, endDateTimeObject);
+        });
+
+        /**
          * Event: Provider "Change"
          */
         $selectProvider.on('change', () => {
@@ -436,6 +516,87 @@ App.Components.AppointmentsModal = (function () {
     }
 
     /**
+     * Initialize Select2 for service dropdowns
+     */
+    function initializeSelect2() {
+        $('#select-service').select2({
+            width: '100%',
+            theme: 'bootstrap-5',
+            placeholder: lang('select_service'),
+            allowClear: false,
+            minimumResultsForSearch: 1,
+            matcher: function(params, data) {
+                // If there are no search terms, return all of the data
+                if (!params.term || params.term.trim() === '') {
+                    return data;
+                }
+
+                // Do not display the item if there is no 'text' property
+                if (typeof data.text === 'undefined') {
+                    return null;
+                }
+
+                const searchTerm = params.term.toLowerCase();
+                const text = data.text.toLowerCase();
+
+                // Search in the text
+                if (text.indexOf(searchTerm) > -1) {
+                    return data;
+                }
+
+                // Search in the group
+                if (data.element && data.element.parentElement) {
+                    const group = $(data.element.parentElement).text().toLowerCase();
+                    if (group.indexOf(searchTerm) > -1) {
+                        return data;
+                    }
+                }
+
+                // Return `null` if the term should not be displayed
+                return null;
+            }
+        });
+    
+        $('#select-additional-services').select2({
+            width: '100%',
+            theme: 'bootstrap-5',
+            placeholder: lang('select_additional_services'),
+            allowClear: true,
+            minimumResultsForSearch: 1,
+            matcher: function(params, data) {
+                // If there are no search terms, return all of the data
+                if (!params.term || params.term.trim() === '') {
+                    return data;
+                }
+
+                // Do not display the item if there is no 'text' property
+                if (typeof data.text === 'undefined') {
+                    return null;
+                }
+
+                const searchTerm = params.term.toLowerCase();
+                const text = data.text.toLowerCase();
+
+                // Search in the text
+                if (text.indexOf(searchTerm) > -1) {
+                    return data;
+                }
+
+                // Search in the group
+                if (data.element && data.element.parentElement) {
+                    const group = $(data.element.parentElement).text().toLowerCase();
+                    if (group.indexOf(searchTerm) > -1) {
+                        return data;
+                    }
+                }
+
+                // Return `null` if the term should not be displayed
+                return null;
+            }
+        });
+    }
+    
+    /**
      * Reset Appointment Dialog
      *
      * This method resets the manage appointment dialog modal to its initial state. After that you can make
@@ -456,7 +617,8 @@ App.Components.AppointmentsModal = (function () {
         $appointmentColor.find('.color-selection-option:first').trigger('click');
 
         // Prepare service and provider select boxes.
-        $selectService.val($selectService.eq(0).attr('value'));
+        $selectService.val([]);
+        $selectAdditionalServices.val([]);
 
         // Fill the providers list box with providers that can serve the appointment's service and then select the
         // user's provider.
@@ -484,7 +646,9 @@ App.Components.AppointmentsModal = (function () {
         // Get the selected service duration. It will be needed in order to calculate the appointment end datetime.
         const serviceId = $selectService.val();
 
-        const service = vars('available_services').forEach((service) => Number(service.id) === Number(serviceId));
+        const service = vars('available_services').find(
+            (availableService) => Number(availableService.id) === Number(serviceId)
+        );
 
         const duration = service ? service.duration : 0;
 
@@ -494,14 +658,31 @@ App.Components.AppointmentsModal = (function () {
         App.Utils.UI.initializeDateTimePicker($startDatetime, {
             onClose: () => {
                 const serviceId = $selectService.val();
+                const additionalServiceIds = $selectAdditionalServices.val() || [];
 
-                // Automatically update the #end-datetime DateTimePicker based on service duration.
-                const service = vars('available_services').find(
-                    (availableService) => Number(availableService.id) === Number(serviceId),
+                // Calculate total duration
+                let totalDuration = 0;
+
+                // Add primary service duration
+                const primaryService = vars('available_services').find(
+                    (availableService) => Number(availableService.id) === Number(serviceId)
                 );
+                if (primaryService) {
+                    totalDuration += primaryService.duration;
+                }
+
+                // Add additional services duration
+                additionalServiceIds.forEach(additionalServiceId => {
+                    const additionalService = vars('available_services').find(
+                        (availableService) => Number(availableService.id) === Number(additionalServiceId)
+                    );
+                    if (additionalService) {
+                        totalDuration += additionalService.duration;
+                    }
+                });
 
                 const startDateTimeObject = App.Utils.UI.getDateTimePickerValue($startDatetime);
-                const endDateTimeObject = new Date(startDateTimeObject.getTime() + service.duration * 60000);
+                const endDateTimeObject = new Date(startDateTimeObject.getTime() + totalDuration * 60000);
                 App.Utils.UI.setDateTimePickerValue($endDatetime, endDateTimeObject);
             },
         });
@@ -510,6 +691,9 @@ App.Components.AppointmentsModal = (function () {
 
         App.Utils.UI.initializeDateTimePicker($endDatetime);
         App.Utils.UI.setDateTimePickerValue($endDatetime, endDatetime);
+
+        $selectService.trigger('change');
+        $selectAdditionalServices.trigger('change');
     }
 
     /**
@@ -581,5 +765,18 @@ App.Components.AppointmentsModal = (function () {
     return {
         resetModal,
         validateAppointmentForm,
+    };
+})();
+
+(function() {
+    var oldSelect2 = jQuery.fn.select2;
+    jQuery.fn.select2 = function() {
+        if (arguments.length === 1 && typeof arguments[0] === 'object' && typeof arguments[0].dropdownParent !== 'defined') {
+            const modalParent = jQuery(this).parents('div.modal').first();
+            if (modalParent.length > 0) {
+                arguments[0].dropdownParent = modalParent;
+            }
+        }
+        return oldSelect2.apply(this,arguments);
     };
 })();
