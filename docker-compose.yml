@@ -1,12 +1,20 @@
 services:
   php-fpm:
-    build: docker/php-fpm
+    build: 
+      context: docker/php-fpm
+      args:
+        # SECURITY WARNING: Only enable XDebug in development environments
+        # Set to 1 to enable XDebug for debugging (NEVER in production!)
+        ENABLE_XDEBUG: 0
     working_dir: /var/www/html
     extra_hosts:
       - host.docker.internal:host-gateway
     volumes:
       - '.:/var/www/html'
       - './docker/php-fpm/php-ini-overrides.ini:/usr/local/etc/php/conf.d/99-overrides.ini'
+    environment:
+      # Ensure production-safe defaults
+      - PHP_INI_SCAN_DIR=/usr/local/etc/php/conf.d
 
   nginx:
     image: 'nginx:1.23.3-alpine'
@@ -29,13 +37,16 @@ services:
     ports:
       - '3306:3306'
 
+# DEVELOPMENT SERVICES (commented out by default for security)
+# Uncomment these services ONLY for development environments
+
 #  phpmyadmin:
 #    image: 'phpmyadmin:5.2.1'
 #    ports:
 #      - '8080:80'
 #    environment:
 #      - 'PMA_HOST=mysql'
-#      - 'UPLOAD_LIMIT=102400K'
+#      - 'UPLOAD_LIMIT=10240K'  # Reduced from 102400K for security
 #
 #  mailpit:
 #    image: 'axllent/mailpit:v1.7'

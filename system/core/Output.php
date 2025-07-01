@@ -510,7 +510,8 @@ class CI_Output {
 
 		// Do we need to generate profile data?
 		// If so, load the Profile class and run it.
-		if ($this->enable_profiler === TRUE)
+		// SECURITY: Disable profiler in production to prevent information disclosure
+		if ($this->enable_profiler === TRUE && ENVIRONMENT !== 'production')
 		{
 			$CI->load->library('profiler');
 			if ( ! empty($this->_profiler_sections))

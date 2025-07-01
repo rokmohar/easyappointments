@@ -230,7 +230,10 @@ class Email_messages
 
         $php_mailer->isHTML();
         $php_mailer->CharSet = 'UTF-8';
-        $php_mailer->SMTPDebug = config('smtp_debug') ? SMTP::DEBUG_SERVER : null;
+        
+        // SECURITY: Disable SMTP debug in production to prevent credential exposure
+        $smtp_debug = config('smtp_debug') && ENVIRONMENT !== 'production';
+        $php_mailer->SMTPDebug = $smtp_debug ? SMTP::DEBUG_SERVER : null;
 
         if (config('protocol') === 'smtp') {
             $php_mailer->isSMTP();

@@ -1,6 +1,7 @@
 FROM php:8.2-apache
 
 ARG VERSION
+ARG ENABLE_XDEBUG=0
 
 ENV BASE_URL="http://localhost"
 ENV LANGUAGE="english"
@@ -38,8 +39,15 @@ COPY . .
 RUN apt-get update \
     && apt-get install -y libfreetype-dev libjpeg62-turbo-dev libpng-dev wget nano ssmtp mailutils \
 	&& curl -sSL https://github.com/mlocati/docker-php-extension-installer/releases/latest/download/install-php-extensions -o - | sh -s \
-      curl gd intl ldap mbstring mysqli xdebug odbc pdo pdo_mysql xml zip exif gettext bcmath csv event imap inotify mcrypt redis \
-    && docker-php-ext-enable xdebug \
+      curl gd intl ldap mbstring mysqli odbc pdo pdo_mysql xml zip exif gettext bcmath csv event imap inotify mcrypt redis \
+    && if [ "$ENABLE_XDEBUG" = "1" ]; then \
+        echo "WARNING: XDebug is being installed. This should ONLY be used in development!"; \
+        curl -sSL https://github.com/mlocati/docker-php-extension-installer/releases/latest/download/install-php-extensions -o - | sh -s xdebug; \
+        docker-php-ext-enable xdebug; \
+        echo "xdebug.mode = debug" >> /usr/local/etc/php/conf.d/99-overrides.ini; \
+       else \
+        echo "XDebug disabled for security. Use ENABLE_XDEBUG=1 build arg to enable in development."; \
+       fi \
     && curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer \
     && curl -sLS https://deb.nodesource.com/setup_18.x | bash - \
     && apt-get install -y nodejs \

@@ -42,6 +42,8 @@ UseSTARTTLS=${SMTP_TLS}
 FromLineOverride=YES
 EOF
 
+# SECURITY WARNING: The following configuration contains sensitive credentials
+# Ensure proper file permissions and access controls are in place
 cat <<EOF >/var/www/html/application/config/email.php
 <?php defined('BASEPATH') or exit('No direct script access allowed');
 
@@ -52,7 +54,7 @@ cat <<EOF >/var/www/html/application/config/email.php
 \$config['useragent'] = 'Easy!Appointments';
 \$config['protocol'] = 'mail'; // or 'smtp'
 \$config['mailtype'] = 'html'; // or 'text'
-\$config['smtp_debug'] = '0'; // or '1'
+\$config['smtp_debug'] = '0'; // SECURITY: Always disable in production
 \$config['smtp_auth'] = ${SMTP_AUTH}; //or FALSE for anonymous relay.
 \$config['smtp_host'] = '${SMTP_HOST}';
 \$config['smtp_user'] = '${SMTP_USERNAME}';
@@ -65,6 +67,10 @@ cat <<EOF >/var/www/html/application/config/email.php
 \$config['crlf'] = "\r\n";
 \$config['newline'] = "\r\n";
 EOF
+
+# Secure the config directory and files
+chown -R www-data:www-data /var/www/html/application/config
+chmod -R 700 /var/www/html/application/config
 
 echo "➜ Install Composer Dependencies"
 [[ -d vendor ]] || composer install

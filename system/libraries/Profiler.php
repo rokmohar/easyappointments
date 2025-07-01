@@ -482,12 +482,20 @@ class CI_Profiler {
 			.'<legend style="color:#000;">&nbsp;&nbsp;'.$this->CI->lang->line('profiler_config').'&nbsp;&nbsp;(<span style="cursor: pointer;" onclick="var s=document.getElementById(\'ci_profiler_config_table\').style;s.display=s.display==\'none\'?\'\':\'none\';this.innerHTML=this.innerHTML==\''.$this->CI->lang->line('profiler_section_show').'\'?\''.$this->CI->lang->line('profiler_section_hide').'\':\''.$this->CI->lang->line('profiler_section_show').'\';">'.$this->CI->lang->line('profiler_section_show')."</span>)</legend>\n\n\n"
 			.'<table style="width:100%;display:none;" id="ci_profiler_config_table">'."\n";
 
+		// SECURITY: Filter sensitive configuration from being displayed
+		$sensitive_keys = ['smtp_pass', 'smtp_user', 'smtp_host', 'encryption_key', 'sess_encrypt_cookie'];
+		
 		foreach ($this->CI->config->config as $config => $val)
 		{
 			$pre       = '';
 			$pre_close = '';
 
-			if (is_array($val) OR is_object($val))
+			// Hide sensitive configuration values
+			if (in_array($config, $sensitive_keys) || stripos($config, 'password') !== false || stripos($config, 'secret') !== false)
+			{
+				$val = '[HIDDEN FOR SECURITY]';
+			}
+			elseif (is_array($val) OR is_object($val))
 			{
 				$val = print_r($val, TRUE);
 
