@@ -13,6 +13,7 @@
 /assets/js/**/*.min.js
 /assets/css/**/*.css
 /assets/vendor
+/public/assets
 /config.php
 /storage/backups/*
 !/storage/backups/.htaccess

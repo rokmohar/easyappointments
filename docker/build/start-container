@@ -1,16 +1,5 @@
 #!/bin/bash
 
-##
-# Set up the currently cloned Easy!Appointments build.
-#
-# This script will perform the required actions so that Easy!Appointments is configured properly to work with the
-# provided environment variables.
-#
-# Usage:
-#
-#  ./docker-entrypoint.sh
-#
-
 # Config
 
 cp config-sample.php config.php
@@ -25,7 +14,7 @@ sed -i "s|const DB_USERNAME = 'user';|const DB_USERNAME = '$DB_USERNAME';|g" con
 sed -i "s|const DB_PASSWORD = 'password';|const DB_PASSWORD = '$DB_PASSWORD';|g" config.php
 
 sed -i "s|const GOOGLE_SYNC_FEATURE = false;|const GOOGLE_SYNC_FEATURE = '$GOOGLE_SYNC_FEATURE';|g" config.php
-sed -i "s|const GOOGLE_PRODUCT_NAME = '';|const GOOGLE_PRODUCT_NAME = '$GOOGLE_GOOGLE_PRODUCT_NAME';|g" config.php
+sed -i "s|const GOOGLE_PRODUCT_NAME = '';|const GOOGLE_PRODUCT_NAME = '$GOOGLE_PRODUCT_NAME';|g" config.php
 sed -i "s|const GOOGLE_CLIENT_ID = '';|const GOOGLE_CLIENT_ID = '$GOOGLE_CLIENT_ID';|g" config.php
 sed -i "s|const GOOGLE_CLIENT_SECRET = '';|const GOOGLE_CLIENT_SECRET = '$GOOGLE_CLIENT_SECRET';|g" config.php
 sed -i "s|const GOOGLE_API_KEY = '';|const GOOGLE_API_KEY = '$GOOGLE_API_KEY';|g" config.php
@@ -73,6 +62,7 @@ echo "➜ Install NPM Dependencies"
 [[ -d node_modules ]] || npm install
 
 echo "➜ Build Project Assets"
-[[ -d assets/vendor ]] || npx gulp compile
+[[ -d public/assets/vendor ]] || npx gulp compile
 
+echo "➜ Start Apache2 Server"
 apache2-foreground
