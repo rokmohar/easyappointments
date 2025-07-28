@@ -234,6 +234,103 @@ class Appointments_api_v1 extends EA_Controller
     }
 
     /**
+     * Store a new appointment with customer upsert.
+     *
+     * This endpoint accepts both customer and appointment data, upserts the customer
+     * (creates if doesn't exist, updates if exists based on email or phone), and then creates
+     * the appointment using the customer ID.
+     */
+    public function store_with_customer(): void
+    {
+        try {
+            $request_data = request();
+
+            if (empty($request_data['customer']) || empty($request_data['appointment'])) {
+                throw new InvalidArgumentException('Both customer and appointment data must be provided.');
+            }
+
+            $customer_data = $request_data['customer'];
+            $appointment_data = $request_data['appointment'];
+
+            $this->customers_model->api_decode($customer_data);
+
+            $existing_customer_id = $this->find_customer_by_email_or_phone($customer_data);
+
+            if ($existing_customer_id) {
+                $customer_data['id'] = $existing_customer_id;
+            } else {
+                unset($customer_data['id']);
+            }
+
+            $customer_id = $this->customers_model->save($customer_data);
+
+            $this->appointments_model->api_decode($appointment_data);
+
+            $appointment_data['id_users_customer'] = $customer_id;
+
+            if (array_key_exists('id', $appointment_data)) {
+                unset($appointment_data['id']);
+            }
+
+            if (!array_key_exists('end_datetime', $appointment_data)) {
+                $appointment_data['end_datetime'] = $this->calculate_end_datetime($appointment_data);
+            }
+
+            $appointment_id = $this->appointments_model->save($appointment_data);
+
+            $created_appointment = $this->appointments_model->find($appointment_id);
+
+            $this->notify_and_sync_appointment($created_appointment);
+
+            $this->appointments_model->api_encode($created_appointment);
+
+            $upserted_customer = $this->customers_model->find($customer_id);
+            $this->customers_model->api_encode($upserted_customer);
+
+            $response = [
+                'appointment' => $created_appointment,
+                'customer' => $upserted_customer,
+            ];
+
+            json_response($response, 201);
+        } catch (Throwable $e) {
+            json_exception($e);
+        }
+    }
+
+    /**
+     * Find a customer by email or phone number.
+     *
+     * @param array $customer_data Customer data containing email and/or phone_number.
+     *
+     * @return int|null Returns the customer ID if found, null otherwise.
+     */
+    private function find_customer_by_email_or_phone(array $customer_data): ?int
+    {
+        $this->db->select('users.id')
+            ->from('users')
+            ->join('roles', 'roles.id = users.id_roles', 'inner')
+            ->where('roles.slug', DB_SLUG_CUSTOMER);
+
+        if (!empty($customer_data['email']) && !empty($customer_data['phone_number'])) {
+            $this->db->group_start()
+                ->where('users.email', $customer_data['email'])
+                ->or_where('users.phone_number', $customer_data['phone_number'])
+                ->group_end();
+        } elseif (!empty($customer_data['email'])) {
+            $this->db->where('users.email', $customer_data['email']);
+        } elseif (!empty($customer_data['phone_number'])) {
+            $this->db->where('users.phone_number', $customer_data['phone_number']);
+        } else {
+            return null;
+        }
+
+        $result = $this->db->get()->row_array();
+
+        return $result ? (int) $result['id'] : null;
+    }
+
+    /**
      * Calculate the end date time of an appointment based on the selected service.
      *
      * @param array $appointment Appointment data.
