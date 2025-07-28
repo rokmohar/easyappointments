@@ -123,6 +123,13 @@ class Appointments_model extends EA_Model
             );
         }
 
+        // Check for overlapping appointments
+        if ($this->has_overlapping_appointment($appointment)) {
+            throw new InvalidArgumentException(
+                'The appointment time period overlaps with an existing appointment for the same provider.'
+            );
+        }
+
         // Make sure the provider ID really exists in the database.
         $count = $this->db
             ->select()
@@ -163,6 +170,58 @@ class Appointments_model extends EA_Model
                 throw new InvalidArgumentException('Appointment service id is invalid.');
             }
         }
+    }
+
+    /**
+     * Check if the appointment overlaps with any existing appointments for the same provider.
+     *
+     * @param array $appointment Appointment data.
+     *
+     * @return bool Returns true if there's an overlapping appointment, false otherwise.
+     */
+    protected function has_overlapping_appointment(array $appointment): bool
+    {
+        $start_datetime = $appointment['start_datetime'];
+        $end_datetime = $appointment['end_datetime'];
+        $provider_id = $appointment['id_users_provider'];
+        $appointment_id = $appointment['id'] ?? null;
+
+        // Build query to find overlapping appointments for the same provider
+        $this->db->select('id')
+            ->from('appointments')
+            ->where('id_users_provider', $provider_id)
+            ->where('is_unavailability', false)
+            ->group_start()
+                // Case 1: New appointment starts during an existing appointment
+                ->group_start()
+                    ->where('start_datetime <=', $start_datetime)
+                    ->where('end_datetime >', $start_datetime)
+                ->group_end()
+                // Case 2: New appointment ends during an existing appointment
+                ->or_group_start()
+                    ->where('start_datetime <', $end_datetime)
+                    ->where('end_datetime >=', $end_datetime)
+                ->group_end()
+                // Case 3: New appointment completely contains an existing appointment
+                ->or_group_start()
+                    ->where('start_datetime >=', $start_datetime)
+                    ->where('end_datetime <=', $end_datetime)
+                ->group_end()
+                // Case 4: Existing appointment completely contains the new appointment
+                ->or_group_start()
+                    ->where('start_datetime <=', $start_datetime)
+                    ->where('end_datetime >=', $end_datetime)
+                ->group_end()
+            ->group_end();
+
+        // Exclude the current appointment if we're updating
+        if ($appointment_id) {
+            $this->db->where('id !=', $appointment_id);
+        }
+
+        $overlapping_appointments = $this->db->get()->result_array();
+
+        return !empty($overlapping_appointments);
     }
 
     /**

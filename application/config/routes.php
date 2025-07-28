@@ -150,6 +150,8 @@ $route['api/v1/settings/(:any)']['put'] = 'api/v1/settings_api_v1/update/$1';
 
 $route['api/v1/availabilities']['get'] = 'api/v1/availabilities_api_v1/get';
 
+$route['api/v1/appointments/with-customer']['post'] = 'api/v1/appointments_api_v1/store_with_customer';
+
 /*
 | -------------------------------------------------------------------------
 | CUSTOM ROUTING
